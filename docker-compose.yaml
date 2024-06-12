@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack
+    container_name: localstack
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - EDGE_PORT=4566
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data 
+    volumes: 
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  terraform:
+    image: hashicorp/terraform:latest
+    container_name: terraform-financial
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./terraform:/terraform
+    working_dir: /terraform
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        terraform init
+        terraform apply -auto-approve
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+       
+  app:
+    container_name: app-financial
+    build: .
+    depends_on:
+      terraform:
+        condition: service_completed_successfully
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - ENDPOINT_URL=http://localstack:4566

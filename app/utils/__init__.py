@@ -1,0 +1,1 @@
+from .dynamo_functions import send_to_health_check
